@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+#
+# 喜马拉雅干净客户端 —— 启动器
+#
+#   xmly              启动客户端（首次会自动拉起本地服务并打开独立窗口）
+#   xmly stop         停止后台的本地服务
+#   xmly status       查看运行状态
+#   xmly browser      用系统默认浏览器打开（不用独立窗口）
+#   xmly --no-window  只启动本地服务
+#
+set -uo pipefail
+
+APP_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+CONFIG_DIR="${XMLY_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/ximalaya-clean}"
+PID_FILE="$CONFIG_DIR/server.pid"
+LOG_FILE="$CONFIG_DIR/server.log"
+# 独立浏览器配置目录，保证不与日常浏览的窗口混在一起
+PROFILE_DIR="${XMLY_PROFILE_DIR:-$HOME/.var/app/com.google.Chrome/config/xmly-clean}"
+[ -d "$HOME/.config/google-chrome" ] && PROFILE_DIR="${XMLY_PROFILE_DIR:-$HOME/.config/xmly-clean-chrome}"
+
+mkdir -p "$CONFIG_DIR"
+
+# ---------- 找 node ----------
+find_node() {
+  if [ -n "${XMLY_NODE:-}" ] && [ -x "$XMLY_NODE" ]; then echo "$XMLY_NODE"; return; fi
+  for c in "$HOME/.local/node/bin/node" /usr/bin/node /usr/local/bin/node; do
+    [ -x "$c" ] && { echo "$c"; return; }
+  done
+  command -v node 2>/dev/null
+}
+NODE="$(find_node)"
+if [ -z "$NODE" ]; then
+  echo "找不到 node。请先安装 Node.js（>= 20），或用 XMLY_NODE=/path/to/node 指定。" >&2
+  exit 1
+fi
+
+# ---------- 读端口 ----------
+read_port() {
+  local p
+  p="$("$NODE" -e "
+    try {
+      const s = require('$APP_DIR/lib/store.js').getSettings();
+      process.stdout.write(String(s.port || 8787));
+    } catch (e) { process.stdout.write('8787'); }
+  " 2>/dev/null)"
+  echo "${p:-8787}"
+}
+PORT="$(read_port)"
+BASE_URL="http://127.0.0.1:$PORT"
+
+is_up() {
+  curl -fsS --max-time 2 "$BASE_URL/api/health" >/dev/null 2>&1
+}
+
+# ---------- 服务控制 ----------
+start_server() {
+  if is_up; then return 0; fi
+  XMLY_QUIET=1 nohup "$NODE" "$APP_DIR/server.js" >>"$LOG_FILE" 2>&1 &
+  local pid=$!
+  echo "$pid" >"$PID_FILE"
+  local i=0
+  while [ $i -lt 60 ]; do
+    if is_up; then return 0; fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "本地服务启动失败，日志： $LOG_FILE" >&2
+      tail -n 20 "$LOG_FILE" >&2
+      return 1
+    fi
+    sleep 0.2
+    i=$((i + 1))
+  done
+  echo "本地服务启动超时，日志： $LOG_FILE" >&2
+  return 1
+}
+
+stop_server() {
+  local pid=""
+  [ -f "$PID_FILE" ] && pid="$(cat "$PID_FILE" 2>/dev/null)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null
+    sleep 0.4
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
+    echo "已停止本地服务（pid $pid）"
+  else
+    # 端口上还有残留进程时按端口清理
+    local other
+    other="$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2)"
+    if [ -n "$other" ]; then
+      kill "$other" 2>/dev/null && echo "已停止端口 $PORT 上的服务（pid $other）"
+    else
+      echo "本地服务未在运行"
+    fi
+  fi
+  rm -f "$PID_FILE"
+}
+
+# ---------- 打开窗口 ----------
+chrome_alive() {
+  pgrep -f -- "xmly-clean" >/dev/null 2>&1
+}
+
+open_window() {
+  local url="$1"
+  local args=(--app="$url" --no-first-run --no-default-browser-check
+              --user-data-dir="$PROFILE_DIR" --window-size=1280,860
+              --disable-features=Translate --lang=zh-CN)
+
+  if command -v google-chrome >/dev/null 2>&1; then
+    google-chrome "${args[@]}"
+  elif command -v google-chrome-stable >/dev/null 2>&1; then
+    google-chrome-stable "${args[@]}"
+  elif command -v chromium >/dev/null 2>&1; then
+    chromium "${args[@]}"
+  elif command -v brave-browser >/dev/null 2>&1; then
+    brave-browser "${args[@]}"
+  elif flatpak info com.google.Chrome >/dev/null 2>&1; then
+    # Flatpak 版 Chrome：--user-data-dir 需落在沙箱可写目录内
+    local fp_profile="$HOME/.var/app/com.google.Chrome/config/xmly-clean"
+    mkdir -p "$fp_profile"
+    flatpak run com.google.Chrome --app="$url" --no-first-run --no-default-browser-check \
+      --user-data-dir="$fp_profile" --window-size=1280,860 \
+      --disable-features=Translate --lang=zh-CN
+  elif flatpak info com.brave.Browser >/dev/null 2>&1; then
+    local fp_profile="$HOME/.var/app/com.brave.Browser/config/xmly-clean"
+    mkdir -p "$fp_profile"
+    flatpak run com.brave.Browser --app="$url" --no-first-run --no-default-browser-check \
+      --user-data-dir="$fp_profile" --window-size=1280,860 --lang=zh-CN
+  else
+    echo "没找到 Chrome / Chromium / Brave，改用系统默认浏览器打开。" >&2
+    xdg-open "$url" >/dev/null 2>&1
+    return 0
+  fi
+}
+
+# ---------- 主流程 ----------
+CMD="${1:-start}"
+
+case "$CMD" in
+  stop)
+    stop_server
+    exit 0
+    ;;
+  status)
+    if is_up; then
+      echo "运行中： $BASE_URL"
+      [ -f "$PID_FILE" ] && echo "pid: $(cat "$PID_FILE")"
+    else
+      echo "未运行"
+    fi
+    exit 0
+    ;;
+  browser)
+    start_server || exit 1
+    xdg-open "$BASE_URL" >/dev/null 2>&1
+    echo "已在浏览器打开： $BASE_URL"
+    exit 0
+    ;;
+  --no-window|serve)
+    start_server || exit 1
+    echo "本地服务已启动： $BASE_URL"
+    exit 0
+    ;;
+  start|"")
+    start_server || exit 1
+    open_window "$BASE_URL"
+    # 窗口关闭后：如果已经没有该配置目录的浏览器进程，就顺手停掉服务
+    sleep 1
+    if ! chrome_alive; then
+      stop_server >/dev/null 2>&1
+    fi
+    exit 0
+    ;;
+  *)
+    echo "用法： xmly [start|stop|status|browser|--no-window]" >&2
+    exit 1
+    ;;
+esac

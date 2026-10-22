@@ -1,0 +1,20 @@
+# 依赖（本项目零依赖，不需要提交）
+node_modules/
+package-lock.json
+
+# 用户数据 —— 绝对不要提交
+cookie.json
+cookie.backup.json
+config.json
+server.log
+server.pid
+*.tmp
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+*.log

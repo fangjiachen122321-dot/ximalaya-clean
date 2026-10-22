@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>喜马拉雅 · 干净版</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23ff7a45'/%3E%3Cpath d='M9 13v6M16 9v14M23 13v6' stroke='%23180d07' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./style.css" />
+  <script>
+    (function () {
+      try {
+        var mode = JSON.parse(localStorage.getItem('xmc.theme') || '"dark"');
+        var dark = mode === 'system'
+          ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          : mode !== 'light';
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.dataset.themeMode = mode;
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="9" fill="var(--accent)" />
+            <path d="M9 13v6M16 9v14M23 13v6" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="brand-text">
+          <strong>喜马拉雅</strong>
+          <em>干净版</em>
+        </span>
+        <button class="icon-btn brand-settings" id="btn-settings" data-icon="settings" aria-label="设置" title="设置"></button>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <a class="nav-item" href="#/search" data-route="search">
+          <span class="nav-ico" data-icon="search"></span><span class="nav-label">搜索</span>
+        </a>
+        <a class="nav-item" href="#/subscriptions" data-route="subscriptions">
+          <span class="nav-ico" data-icon="radio"></span><span class="nav-label">我的订阅</span>
+        </a>
+        <a class="nav-item" href="#/listened" data-route="listened">
+          <span class="nav-ico" data-icon="clock"></span><span class="nav-label">最近收听</span>
+        </a>
+        <a class="nav-item" href="#/likes" data-route="likes">
+          <span class="nav-ico" data-icon="heart"></span><span class="nav-label">我喜欢的</span>
+        </a>
+        <a class="nav-item" href="#/bought" data-route="bought">
+          <span class="nav-ico" data-icon="bag"></span><span class="nav-label">已购专辑</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="account" id="account"></div>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <header class="topbar" id="topbar">
+        <button class="icon-btn topbar-back" id="btn-back" data-icon="arrow-left" aria-label="返回" title="返回" disabled></button>
+        <h1 class="topbar-title" id="topbar-title">首页</h1>
+        <div class="topbar-right">
+          <button class="topbar-search" id="btn-topbar-search" type="button" aria-label="搜索">
+            <span class="topbar-search-ico" data-icon="search"></span>
+            <span class="topbar-search-label">搜索</span>
+            <kbd class="kbd">/</kbd>
+          </button>
+        </div>
+      </header>
+      <div class="view" id="view"></div>
+    </main>
+
+    <footer class="player" id="player">
+      <div class="player-left">
+        <button class="pl-cover" id="pl-cover" aria-label="查看专辑" title="查看专辑">
+          <span class="cover-fallback" data-icon="music"></span>
+          <img id="pl-cover-img" class="cover-img" alt="" hidden />
+        </button>
+        <div class="pl-meta">
+          <a class="pl-title" id="pl-title" href="#/">未在播放</a>
+          <a class="pl-sub" id="pl-sub" href="#/"></a>
+        </div>
+        <span class="pl-quality" id="pl-quality" hidden></span>
+      </div>
+
+      <div class="player-center">
+        <div class="pl-controls">
+          <button class="icon-btn" id="btn-prev" data-icon="prev" aria-label="上一首" title="上一首 (P)"></button>
+          <button class="pl-play" id="btn-play" aria-label="播放" title="播放 / 暂停 (空格)">
+            <span class="ico" data-icon="play"></span>
+          </button>
+          <button class="icon-btn" id="btn-next" data-icon="next" aria-label="下一首" title="下一首 (N)"></button>
+        </div>
+        <div class="pl-progress">
+          <span class="pl-time" id="pl-cur">0:00</span>
+          <div class="slider" id="seek" role="slider" tabindex="0"
+               aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="slider-rail"><div class="slider-fill"></div></div>
+            <div class="slider-thumb"></div>
+          </div>
+          <span class="pl-time" id="pl-dur">0:00</span>
+        </div>
+      </div>
+
+      <div class="player-right">
+        <button class="pill-btn" id="btn-rate" title="播放速度">1.0x</button>
+        <button class="icon-btn" id="btn-mode" data-icon="repeat" aria-label="播放模式" title="列表循环"></button>
+        <div class="volume-wrap">
+          <button class="icon-btn" id="btn-mute" data-icon="volume" aria-label="静音" title="静音"></button>
+          <div class="slider slider-vol" id="vol" role="slider" tabindex="0"
+               aria-label="音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80">
+            <div class="slider-rail"><div class="slider-fill"></div></div>
+            <div class="slider-thumb"></div>
+          </div>
+        </div>
+        <button class="icon-btn" id="btn-queue" data-icon="queue" aria-label="播放队列" title="播放队列"></button>
+        <button class="icon-btn" id="btn-more" data-icon="more" aria-label="更多" title="更多"></button>
+      </div>
+    </footer>
+  </div>
+
+  <div class="notice-root" id="notice-root" role="region" aria-label="提示"></div>
+  <div class="overlay-root" id="overlay-root"></div>
+  <div class="toast-root" id="toast-root" aria-live="polite" aria-atomic="false"></div>
+  <audio id="audio" preload="metadata"></audio>
+
+  <noscript>
+    <div class="noscript">本客户端需要启用 JavaScript 才能运行。</div>
+  </noscript>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

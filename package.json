@@ -1,0 +1,16 @@
+{
+  "name": "ximalaya-clean",
+  "version": "1.0.0",
+  "private": true,
+  "description": "喜马拉雅干净客户端：本机运行、无广告、无推荐轰炸",
+  "main": "server.js",
+  "bin": {
+    "xmly": "bin/xmly"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
