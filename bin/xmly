@@ -35,7 +35,12 @@ if [ -z "$NODE" ]; then
 fi
 
 # ---------- 读端口 ----------
+# 优先级与 server.js 一致：环境变量 PORT > 配置文件 > 8787
 read_port() {
+  if [ -n "${PORT:-}" ]; then
+    echo "$PORT"
+    return
+  fi
   local p
   p="$("$NODE" -e "
     try {
@@ -70,6 +75,9 @@ start_server() {
     i=$((i + 1))
   done
   echo "本地服务启动超时，日志： $LOG_FILE" >&2
+  echo "提示：端口 $PORT 可能被占用，可在设置里换一个端口。" >&2
+  kill "$pid" 2>/dev/null
+  rm -f "$PID_FILE"
   return 1
 }
 
